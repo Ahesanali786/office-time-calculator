@@ -1,13 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced Workday Time Calculator</title>
+    <title>Advanced Workday Time Calculator Pro</title>
     <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
     <div class="container">
         <!-- Navigation -->
@@ -40,10 +38,15 @@
             <div class="status-item">
                 <span class="status-label">Current Time</span>
                 <span class="status-value" id="currentTime">--:--</span>
+                <span class="status-format" id="currentTimeFormat">12H</span>
             </div>
             <div class="status-item">
                 <span class="status-label">Work Status</span>
                 <span class="status-value" id="workStatus">Not Started</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Break Status</span>
+                <span class="status-value" id="breakStatus">Not on Break</span>
             </div>
             <div class="status-item progress-item">
                 <span class="status-label">Progress</span>
@@ -52,6 +55,43 @@
                         <div class="progress-fill"></div>
                     </div>
                     <span class="progress-text" id="progressText">0%</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Break Tracker -->
+        <div class="break-tracker" id="breakTracker">
+            <div class="break-header">
+                <h3>Break Tracker</h3>
+                <div class="break-controls">
+                    <button class="break-btn start-break" id="startBreak">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10" />
+                            <polygon points="10,8 16,12 10,16 10,8" />
+                        </svg>
+                        Start Break
+                    </button>
+                    <button class="break-btn end-break" id="endBreak" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10" />
+                            <rect x="9" y="9" width="6" height="6" />
+                        </svg>
+                        End Break
+                    </button>
+                </div>
+            </div>
+            <div class="break-info">
+                <div class="break-stat">
+                    <span class="break-label">Current Break</span>
+                    <span class="break-value" id="currentBreakTime">00:00</span>
+                </div>
+                <div class="break-stat">
+                    <span class="break-label">Total Breaks Today</span>
+                    <span class="break-value" id="totalBreakTime">00:00</span>
+                </div>
+                <div class="break-stat">
+                    <span class="break-label">Breaks Taken</span>
+                    <span class="break-value" id="breakCount">0</span>
                 </div>
             </div>
         </div>
@@ -128,14 +168,6 @@
                             <div class="duration-inputs">
                                 <input type="number" id="stdBreakH" min="0" max="4" value="0" placeholder="Hours">
                                 <input type="number" id="stdBreakM" min="0" max="59" value="45" placeholder="Minutes">
-                            </div>
-                        </div>
-
-                        <div class="input-group">
-                            <label>Actual Break Taken</label>
-                            <div class="duration-inputs">
-                                <input type="number" id="actBreakH" min="0" max="4" value="0" placeholder="Hours">
-                                <input type="number" id="actBreakM" min="0" max="59" value="30" placeholder="Minutes">
                             </div>
                         </div>
 
@@ -227,6 +259,15 @@
                     </div>
                 </div>
 
+                <!-- Real Exit Time Card -->
+                <div class="real-exit-card">
+                    <h3>Real Exit Time (After Break Deduction)</h3>
+                    <div class="real-exit-info">
+                        <div class="real-exit-time" id="realExitTime">--:--</div>
+                        <div class="real-exit-meta" id="realExitMeta">Start tracking breaks to see real exit time</div>
+                    </div>
+                </div>
+
                 <!-- Today's Summary -->
                 <div class="summary-card">
                     <h3>Today's Summary</h3>
@@ -281,6 +322,24 @@
             <div class="tab-content" id="settings">
                 <div class="settings-grid">
                     <div class="settings-card">
+                        <h3>Time Format Settings</h3>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" id="show12Hour" checked>
+                                <span class="checkmark"></span>
+                                <span class="setting-text">12-Hour Format</span>
+                            </label>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" id="showSeconds">
+                                <span class="checkmark"></span>
+                                <span class="setting-text">Show Seconds</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-card">
                         <h3>Notification Settings</h3>
                         <div class="setting-item">
                             <label class="setting-label">
@@ -306,24 +365,6 @@
                     </div>
                     
                     <div class="settings-card">
-                        <h3>Display Preferences</h3>
-                        <div class="setting-item">
-                            <label class="setting-label">
-                                <input type="checkbox" id="show24Hour" checked>
-                                <span class="checkmark"></span>
-                                <span class="setting-text">24-Hour Format</span>
-                            </label>
-                        </div>
-                        <div class="setting-item">
-                            <label class="setting-label">
-                                <input type="checkbox" id="showSeconds">
-                                <span class="checkmark"></span>
-                                <span class="setting-text">Show Seconds</span>
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <div class="settings-card">
                         <h3>Data Management</h3>
                         <div class="setting-actions">
                             <button class="btn btn-secondary" id="clearHistory">Clear History</button>
@@ -335,11 +376,28 @@
             </div>
         </div>
 
+        <!-- History Detail Modal -->
+        <div class="modal-overlay" id="historyModal">
+            <div class="modal">
+                <div class="modal-header">
+                    <h3 id="modalTitle">Day Details</h3>
+                    <button class="modal-close" id="closeModal">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-content" id="modalContent">
+                    <!-- Modal content will be populated here -->
+                </div>
+            </div>
+        </div>
+
         <!-- Notification Container -->
         <div class="notification-container" id="notificationContainer"></div>
     </div>
 
     <script src="script.js"></script>
 </body>
-
 </html>

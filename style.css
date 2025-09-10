@@ -175,6 +175,7 @@ body {
   border-radius: var(--radius-lg);
   text-align: center;
   min-width: 0;
+  position: relative;
 }
 
 .progress-item {
@@ -197,6 +198,17 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   width: 100%;
+}
+
+.status-format {
+  font-size: 0.625rem;
+  color: var(--text-muted);
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: var(--bg-input);
+  padding: 0.125rem 0.375rem;
+  border-radius: var(--radius-sm);
 }
 
 .progress-container {
@@ -230,6 +242,141 @@ body {
   color: var(--text-secondary);
   min-width: 2.5rem;
   flex-shrink: 0;
+}
+
+/* Break Tracker */
+.break-tracker {
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-lg);
+}
+
+.break-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.break-header h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-accent);
+}
+
+.break-controls {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.break-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.break-btn svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.start-break {
+  background: var(--success-color);
+  color: white;
+}
+
+.start-break:hover:not(:disabled) {
+  background: #059669;
+  transform: translateY(-1px);
+}
+
+.end-break {
+  background: var(--danger-color);
+  color: white;
+}
+
+.end-break:hover:not(:disabled) {
+  background: #dc2626;
+  transform: translateY(-1px);
+}
+
+.break-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.break-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.break-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
+  background: var(--bg-input);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.break-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+}
+
+.break-value {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Real Exit Time Card */
+.real-exit-card {
+  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+  border-radius: var(--radius-xl);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  color: white;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+}
+
+.real-exit-card h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  opacity: 0.9;
+}
+
+.real-exit-time {
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.025em;
+}
+
+.real-exit-meta {
+  font-size: 0.875rem;
+  opacity: 0.8;
 }
 
 /* Tab Navigation */
@@ -831,6 +978,13 @@ input[type="number"]:hover {
   padding: 0.75rem;
   border-bottom: 1px solid var(--border-color);
   gap: 1rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.history-item:hover {
+  background: var(--bg-input);
+  border-radius: var(--radius-md);
 }
 
 .history-item:last-child {
@@ -915,6 +1069,162 @@ input[type="number"]:hover {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-overlay.active {
+  display: flex;
+  animation: modalFadeIn 0.3s ease-out;
+}
+
+.modal {
+  background: var(--bg-card);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  max-width: 600px;
+  width: 100%;
+  max-height: 80vh;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-accent);
+}
+
+.modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.modal-close:hover {
+  background: var(--danger-color);
+  color: white;
+}
+
+.modal-close svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.modal-content {
+  padding: 1.5rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.modal-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.modal-detail-item {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  background: var(--bg-input);
+  border-radius: var(--radius-md);
+}
+
+.modal-detail-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+}
+
+.modal-detail-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.break-timeline {
+  margin-top: 1rem;
+}
+
+.break-timeline h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-accent);
+  margin-bottom: 0.75rem;
+}
+
+.break-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.break-entry:last-child {
+  border-bottom: none;
+}
+
+.break-time-range {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.break-duration {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* Notifications */
@@ -1247,7 +1557,9 @@ input[type="number"]:hover {
   .chart-card,
   .stats-card,
   .history-card,
-  .settings-card {
+  .settings-card,
+  .break-tracker,
+  .real-exit-card {
     padding: 1rem;
     margin-bottom: 1rem;
   }
@@ -1365,6 +1677,39 @@ input[type="number"]:hover {
   .notification {
     padding: 0.75rem;
   }
+  
+  .break-info {
+    grid-template-columns: 1fr;
+  }
+  
+  .break-controls {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .break-header {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+  
+  .real-exit-time {
+    font-size: 2rem;
+  }
+  
+  .modal {
+    margin: 0.5rem;
+    max-height: 90vh;
+  }
+  
+  .modal-header,
+  .modal-content {
+    padding: 1rem;
+  }
+  
+  .modal-detail-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Extra Small Mobile (below 320px) */
@@ -1402,7 +1747,9 @@ input[type="number"]:hover {
   .chart-card,
   .stats-card,
   .history-card,
-  .settings-card {
+  .settings-card,
+  .break-tracker,
+  .real-exit-card {
     padding: 0.75rem;
   }
   
@@ -1412,6 +1759,10 @@ input[type="number"]:hover {
   
   .result-time {
     font-size: 1.25rem;
+  }
+  
+  .real-exit-time {
+    font-size: 1.5rem;
   }
 }
 
@@ -1468,7 +1819,8 @@ input[type="number"]:hover {
   .actions,
   .result-actions,
   .notification-container,
-  .tab-navigation {
+  .tab-navigation,
+  .break-tracker {
     display: none;
   }
   
@@ -1493,7 +1845,8 @@ input[type="number"]:hover {
   .btn,
   .quick-btn,
   .result-btn,
-  .tab-btn {
+  .tab-btn,
+  .break-btn {
     min-height: 44px;
   }
   
@@ -1519,7 +1872,7 @@ input[type="number"]:hover {
   }
   
   .status-bar {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
   }
   
   .progress-item {
@@ -1532,6 +1885,10 @@ input[type="number"]:hover {
   
   .results-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .break-info {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 

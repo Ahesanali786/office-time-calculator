@@ -8,6 +8,11 @@ class WorkdayCalculator {
         this.isNotificationsEnabled = false;
         this.theme = localStorage.getItem('theme') || 'dark';
         
+        // Break tracking
+        this.breakSessions = [];
+        this.currentBreakStart = null;
+        this.isOnBreak = false;
+        
         this.init();
     }
 
@@ -22,6 +27,7 @@ class WorkdayCalculator {
         this.renderAnalytics();
         this.renderSettings();
         this.handleResponsiveFeatures();
+        this.loadBreakSessions();
     }
 
     initTheme() {
@@ -73,6 +79,15 @@ class WorkdayCalculator {
             this.setReminder('B');
         });
 
+        // Break tracking
+        document.getElementById('startBreak').addEventListener('click', () => {
+            this.startBreak();
+        });
+
+        document.getElementById('endBreak').addEventListener('click', () => {
+            this.endBreak();
+        });
+
         // Settings
         document.getElementById('clearHistory').addEventListener('click', () => {
             this.clearHistory();
@@ -84,6 +99,17 @@ class WorkdayCalculator {
 
         document.getElementById('backupData').addEventListener('click', () => {
             this.backupData();
+        });
+
+        // Modal
+        document.getElementById('closeModal').addEventListener('click', () => {
+            this.closeModal();
+        });
+
+        document.getElementById('historyModal').addEventListener('click', (e) => {
+            if (e.target.id === 'historyModal') {
+                this.closeModal();
+            }
         });
 
         // Handle window resize for responsive features
@@ -162,6 +188,7 @@ class WorkdayCalculator {
         setInterval(() => {
             this.updateCurrentTime();
             this.updateProgress();
+            this.updateBreakTracker();
             this.checkReminders();
         }, 1000);
 
@@ -251,6 +278,12 @@ class WorkdayCalculator {
         return `${sign}${h}h ${m}m`;
     }
 
+    formatTime(mins) {
+        const h = Math.floor(Math.abs(mins) / 60);
+        const m = Math.abs(mins) % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+
     getCurrentTime() {
         const now = new Date();
         const hours = String(now.getHours()).padStart(2, '0');
@@ -272,8 +305,6 @@ class WorkdayCalculator {
                 workM: document.getElementById('workM').value,
                 stdBreakH: document.getElementById('stdBreakH').value,
                 stdBreakM: document.getElementById('stdBreakM').value,
-                actBreakH: document.getElementById('actBreakH').value,
-                actBreakM: document.getElementById('actBreakM').value,
                 presenceH: document.getElementById('presenceH').value,
                 presenceM: document.getElementById('presenceM').value,
             };
@@ -294,8 +325,6 @@ class WorkdayCalculator {
             document.getElementById('workM').value = settings.workM || '15';
             document.getElementById('stdBreakH').value = settings.stdBreakH || '0';
             document.getElementById('stdBreakM').value = settings.stdBreakM || '45';
-            document.getElementById('actBreakH').value = settings.actBreakH || '0';
-            document.getElementById('actBreakM').value = settings.actBreakM || '30';
             document.getElementById('presenceH').value = settings.presenceH || '9';
             document.getElementById('presenceM').value = settings.presenceM || '0';
             
@@ -306,17 +335,124 @@ class WorkdayCalculator {
         }
     }
 
+    // Break tracking
+    loadBreakSessions() {
+        const today = new Date().toISOString().split('T')[0];
+        const data = localStorage.getItem(`break-sessions-${today}`);
+        this.breakSessions = data ? JSON.parse(data) : [];
+        
+        // Check if there's an ongoing break
+        const ongoingBreak = this.breakSessions.find(session => !session.endTime);
+        if (ongoingBreak) {
+            this.currentBreakStart = ongoingBreak.startTime;
+            this.isOnBreak = true;
+            document.getElementById('startBreak').disabled = true;
+            document.getElementById('endBreak').disabled = false;
+        }
+        
+        this.updateBreakTracker();
+    }
+
+    saveBreakSessions() {
+        const today = new Date().toISOString().split('T')[0];
+        localStorage.setItem(`break-sessions-${today}`, JSON.stringify(this.breakSessions));
+    }
+
+    startBreak() {
+        if (this.isOnBreak) return;
+        
+        const now = this.getCurrentTimeInMinutes();
+        this.currentBreakStart = now;
+        this.isOnBreak = true;
+        
+        this.breakSessions.push({
+            startTime: now,
+            endTime: null,
+            duration: 0
+        });
+        
+        document.getElementById('startBreak').disabled = true;
+        document.getElementById('endBreak').disabled = false;
+        
+        this.saveBreakSessions();
+        this.showNotification('Break started', 'success');
+    }
+
+    endBreak() {
+        if (!this.isOnBreak) return;
+        
+        const now = this.getCurrentTimeInMinutes();
+        const duration = now - this.currentBreakStart;
+        
+        // Update the current break session
+        const currentSession = this.breakSessions.find(session => !session.endTime);
+        if (currentSession) {
+            currentSession.endTime = now;
+            currentSession.duration = duration;
+        }
+        
+        this.isOnBreak = false;
+        this.currentBreakStart = null;
+        
+        document.getElementById('startBreak').disabled = false;
+        document.getElementById('endBreak').disabled = true;
+        
+        this.saveBreakSessions();
+        this.calculateResults(); // Recalculate with new break time
+        this.showNotification(`Break ended (${this.formatDuration(duration)})`, 'success');
+    }
+
+    getTotalBreakTime() {
+        let total = 0;
+        this.breakSessions.forEach(session => {
+            if (session.endTime) {
+                total += session.duration;
+            } else if (this.isOnBreak) {
+                // Add current ongoing break time
+                total += this.getCurrentTimeInMinutes() - session.startTime;
+            }
+        });
+        return total;
+    }
+
+    updateBreakTracker() {
+        const totalBreakTime = this.getTotalBreakTime();
+        const currentBreakTime = this.isOnBreak ? 
+            this.getCurrentTimeInMinutes() - this.currentBreakStart : 0;
+        
+        document.getElementById('currentBreakTime').textContent = this.formatTime(currentBreakTime);
+        document.getElementById('totalBreakTime').textContent = this.formatTime(totalBreakTime);
+        document.getElementById('breakCount').textContent = this.breakSessions.length;
+        
+        // Update break status
+        document.getElementById('breakStatus').textContent = this.isOnBreak ? 'On Break' : 'Not on Break';
+    }
+
     // Real-time updates
     updateCurrentTime() {
         const now = new Date();
-        const showSeconds = document.getElementById('showSeconds')?.checked;
-        const timeString = now.toLocaleTimeString('en-US', { 
-            hour12: false, 
-            hour: '2-digit', 
-            minute: '2-digit',
-            second: showSeconds ? '2-digit' : undefined 
-        });
+        const show12Hour = document.getElementById('show12Hour')?.checked ?? true;
+        const showSeconds = document.getElementById('showSeconds')?.checked ?? false;
+        
+        let timeString;
+        if (show12Hour) {
+            timeString = now.toLocaleTimeString('en-US', { 
+                hour12: true, 
+                hour: 'numeric', 
+                minute: '2-digit',
+                second: showSeconds ? '2-digit' : undefined 
+            });
+        } else {
+            timeString = now.toLocaleTimeString('en-US', { 
+                hour12: false, 
+                hour: '2-digit', 
+                minute: '2-digit',
+                second: showSeconds ? '2-digit' : undefined 
+            });
+        }
+        
         document.getElementById('currentTime').textContent = timeString;
+        document.getElementById('currentTimeFormat').textContent = show12Hour ? '12H' : '24H';
     }
 
     updateProgress() {
@@ -363,14 +499,13 @@ class WorkdayCalculator {
             document.getElementById('workH').value,
             document.getElementById('workM').value
         );
-        const actualBreakMinutes = this.toMinutes(
-            document.getElementById('actBreakH').value,
-            document.getElementById('actBreakM').value
-        );
         const presenceMinutes = this.toMinutes(
             document.getElementById('presenceH').value,
             document.getElementById('presenceM').value
         );
+
+        // Get actual break time from tracker
+        const actualBreakMinutes = this.getTotalBreakTime();
 
         const ruleAEndTime = inTimeMinutes + workingMinutes + actualBreakMinutes;
         const ruleBEndTime = inTimeMinutes + presenceMinutes;
@@ -383,28 +518,32 @@ class WorkdayCalculator {
         this.updateRuleResults('A', ruleAEndTime, currentTimeMinutes, workingMinutes, actualBreakMinutes);
         this.updateRuleResults('B', ruleBEndTime, currentTimeMinutes, presenceMinutes, 0);
 
+        // Calculate real exit time (considering break deduction)
+        this.updateRealExitTime(inTimeMinutes, workingMinutes, actualBreakMinutes);
+
         // Update summary
         this.updateSummary(attendedMinutes, actualBreakMinutes, workingMinutes, Math.min(ruleAEndTime, ruleBEndTime));
 
         // Save to log
-        this.saveToLog(ruleAEndTime, ruleBEndTime, attendedMinutes);
+        this.saveToLog(ruleAEndTime, ruleBEndTime, attendedMinutes, actualBreakMinutes);
         
         this.saveSettings();
     }
 
     updateRuleResults(rule, endTime, currentTime, workTime, breakTime) {
         const remaining = endTime - currentTime;
-        const isOptimal = rule === 'A' ? 
-            endTime <= this.parseTimeToMinutes(document.getElementById('inTime').value) + this.toMinutes(document.getElementById('presenceH').value, document.getElementById('presenceM').value) :
-            endTime <= this.parseTimeToMinutes(document.getElementById('inTime').value) + this.toMinutes(document.getElementById('workH').value, document.getElementById('workM').value) + this.toMinutes(document.getElementById('actBreakH').value, document.getElementById('actBreakM').value);
+        const isOptimal = remaining <= 30 && remaining >= -30; // Within 30 minutes is optimal
 
         // Update time display
-        const show24Hour = document.getElementById('show24Hour')?.checked ?? true;
-        const timeDisplay = show24Hour ? this.format24Hour(endTime) : this.format12Hour(endTime);
+        const show12Hour = document.getElementById('show12Hour')?.checked ?? true;
+        const timeDisplay = show12Hour ? this.format12Hour(endTime) : this.format24Hour(endTime);
         const timeElement = document.getElementById(`rule${rule}Time`);
-        timeElement.innerHTML = show24Hour ? 
-            timeDisplay : 
-            `${timeDisplay} <span class="time-24">(${this.format24Hour(endTime)})</span>`;
+        
+        if (show12Hour) {
+            timeElement.innerHTML = `${timeDisplay} <span class="time-24">(${this.format24Hour(endTime)})</span>`;
+        } else {
+            timeElement.textContent = timeDisplay;
+        }
 
         // Update countdown
         const countdownElement = document.getElementById(`countdown${rule}`);
@@ -436,16 +575,42 @@ class WorkdayCalculator {
 
         // Update badge
         const badge = document.querySelector(`#rule${rule} .rule-badge`);
-        badge.classList.toggle('optimal', remaining <= Math.abs(remaining) && remaining >= -30); // Within 30 minutes is considered optimal
+        badge.classList.toggle('optimal', isOptimal);
+    }
+
+    updateRealExitTime(inTime, workTime, actualBreakTime) {
+        const realExitTime = inTime + workTime + actualBreakTime;
+        const currentTime = this.getCurrentTimeInMinutes();
+        const remaining = realExitTime - currentTime;
+        
+        const show12Hour = document.getElementById('show12Hour')?.checked ?? true;
+        const timeDisplay = show12Hour ? this.format12Hour(realExitTime) : this.format24Hour(realExitTime);
+        
+        document.getElementById('realExitTime').textContent = timeDisplay;
+        
+        let metaText = `Based on ${this.formatDuration(workTime)} work + ${this.formatDuration(actualBreakTime)} actual breaks`;
+        if (remaining > 0) {
+            metaText += ` • ${this.formatDuration(remaining)} remaining`;
+        } else if (remaining < 0) {
+            metaText += ` • ${this.formatDuration(-remaining)} overtime`;
+        } else {
+            metaText += ` • Time to leave!`;
+        }
+        
+        document.getElementById('realExitMeta').textContent = metaText;
     }
 
     updateSummary(attendedMinutes, breakMinutes, workMinutes, recommendedExit) {
-        document.getElementById('timeWorked').textContent = this.formatDuration(Math.max(0, attendedMinutes - breakMinutes));
+        const actualWorkTime = Math.max(0, attendedMinutes - breakMinutes);
+        document.getElementById('timeWorked').textContent = this.formatDuration(actualWorkTime);
         document.getElementById('breakTime').textContent = this.formatDuration(breakMinutes);
         
-        const efficiency = workMinutes > 0 ? Math.round(((attendedMinutes - breakMinutes) / workMinutes) * 100) : 0;
+        const efficiency = workMinutes > 0 ? Math.round((actualWorkTime / workMinutes) * 100) : 0;
         document.getElementById('efficiency').textContent = `${Math.max(0, Math.min(100, efficiency))}%`;
-        document.getElementById('recommendedExit').textContent = this.format24Hour(recommendedExit);
+        
+        const show12Hour = document.getElementById('show12Hour')?.checked ?? true;
+        const exitDisplay = show12Hour ? this.format12Hour(recommendedExit) : this.format24Hour(recommendedExit);
+        document.getElementById('recommendedExit').textContent = exitDisplay;
     }
 
     // Quick actions
@@ -456,23 +621,31 @@ class WorkdayCalculator {
     }
 
     resetCalculator() {
-        if (confirm('Are you sure you want to reset all settings?')) {
+        if (confirm('Are you sure you want to reset all settings and break data?')) {
             // Reset inputs to defaults
             document.getElementById('inTime').value = '';
             document.getElementById('workH').value = '8';
             document.getElementById('workM').value = '15';
             document.getElementById('stdBreakH').value = '0';
             document.getElementById('stdBreakM').value = '45';
-            document.getElementById('actBreakH').value = '0';
-            document.getElementById('actBreakM').value = '30';
             document.getElementById('presenceH').value = '9';
             document.getElementById('presenceM').value = '0';
+
+            // Reset break tracking
+            this.breakSessions = [];
+            this.currentBreakStart = null;
+            this.isOnBreak = false;
+            document.getElementById('startBreak').disabled = false;
+            document.getElementById('endBreak').disabled = true;
+            this.saveBreakSessions();
 
             // Reset displays
             document.getElementById('ruleATime').textContent = '--:--';
             document.getElementById('ruleBTime').textContent = '--:--';
             document.getElementById('ruleAMeta').textContent = 'Configure your times above to see results';
             document.getElementById('ruleBMeta').textContent = 'Configure your times above to see results';
+            document.getElementById('realExitTime').textContent = '--:--';
+            document.getElementById('realExitMeta').textContent = 'Start tracking breaks to see real exit time';
 
             // Reset badges
             document.querySelectorAll('.rule-badge').forEach(badge => {
@@ -528,8 +701,8 @@ class WorkdayCalculator {
         if (!inTime) return null;
         
         const work = this.toMinutes(document.getElementById('workH').value, document.getElementById('workM').value);
-        const break_time = this.toMinutes(document.getElementById('actBreakH').value, document.getElementById('actBreakM').value);
-        return inTime + work + break_time;
+        const breakTime = this.getTotalBreakTime();
+        return inTime + work + breakTime;
     }
 
     calculateRuleBEndTime() {
@@ -563,7 +736,7 @@ class WorkdayCalculator {
     }
 
     // Data management
-    saveToLog(ruleATime, ruleBTime, attendedTime) {
+    saveToLog(ruleATime, ruleBTime, attendedTime, actualBreakTime) {
         const today = new Date().toISOString().split('T')[0];
         let logs = JSON.parse(localStorage.getItem('workday-calculator-log') || '{}');
         
@@ -571,11 +744,13 @@ class WorkdayCalculator {
             date: today,
             inTime: document.getElementById('inTime').value,
             workHours: `${document.getElementById('workH').value}h ${document.getElementById('workM').value}m`,
-            breakTime: `${document.getElementById('actBreakH').value}h ${document.getElementById('actBreakM').value}m`,
+            breakTime: this.formatDuration(actualBreakTime),
             attendedTime: this.formatDuration(attendedTime),
             ruleAExit: this.format24Hour(ruleATime),
             ruleBExit: this.format24Hour(ruleBTime),
-            efficiency: Math.round((attendedTime / this.toMinutes(document.getElementById('workH').value, document.getElementById('workM').value)) * 100)
+            realExitTime: this.format24Hour(this.parseTimeToMinutes(document.getElementById('inTime').value) + this.toMinutes(document.getElementById('workH').value, document.getElementById('workM').value) + actualBreakTime),
+            efficiency: Math.round(((attendedTime - actualBreakTime) / this.toMinutes(document.getElementById('workH').value, document.getElementById('workM').value)) * 100),
+            breakSessions: [...this.breakSessions]
         };
         
         localStorage.setItem('workday-calculator-log', JSON.stringify(logs));
@@ -585,9 +760,14 @@ class WorkdayCalculator {
         const settings = JSON.parse(localStorage.getItem('workday-calculator-settings') || '{}');
         const logs = JSON.parse(localStorage.getItem('workday-calculator-log') || '{}');
         
+        // Include break sessions for today
+        const today = new Date().toISOString().split('T')[0];
+        const todayBreaks = localStorage.getItem(`break-sessions-${today}`);
+        
         const data = {
             settings,
             logs,
+            todayBreaks: todayBreaks ? JSON.parse(todayBreaks) : [],
             exportDate: new Date().toISOString()
         };
         
@@ -607,6 +787,13 @@ class WorkdayCalculator {
     clearHistory() {
         if (confirm('Are you sure you want to clear all history?')) {
             localStorage.removeItem('workday-calculator-log');
+            // Clear all break sessions
+            const keys = Object.keys(localStorage);
+            keys.forEach(key => {
+                if (key.startsWith('break-sessions-')) {
+                    localStorage.removeItem(key);
+                }
+            });
             this.renderAnalytics();
             this.showNotification('History cleared successfully', 'success');
         }
@@ -617,12 +804,99 @@ class WorkdayCalculator {
             localStorage.removeItem('workday-calculator-settings');
             localStorage.removeItem('workday-calculator-log');
             localStorage.removeItem('theme');
+            // Clear all break sessions
+            const keys = Object.keys(localStorage);
+            keys.forEach(key => {
+                if (key.startsWith('break-sessions-')) {
+                    localStorage.removeItem(key);
+                }
+            });
             location.reload();
         }
     }
 
     backupData() {
         this.exportData();
+    }
+
+    // Modal management
+    openHistoryModal(date, logData) {
+        const modal = document.getElementById('historyModal');
+        const title = document.getElementById('modalTitle');
+        const content = document.getElementById('modalContent');
+        
+        title.textContent = `Details for ${new Date(date).toLocaleDateString()}`;
+        
+        const show12Hour = document.getElementById('show12Hour')?.checked ?? true;
+        
+        let modalHTML = `
+            <div class="modal-detail-grid">
+                <div class="modal-detail-item">
+                    <span class="modal-detail-label">Clock In Time</span>
+                    <span class="modal-detail-value">${logData.inTime || 'Not set'}</span>
+                </div>
+                <div class="modal-detail-item">
+                    <span class="modal-detail-label">Work Hours Required</span>
+                    <span class="modal-detail-value">${logData.workHours || 'Not set'}</span>
+                </div>
+                <div class="modal-detail-item">
+                    <span class="modal-detail-label">Time Attended</span>
+                    <span class="modal-detail-value">${logData.attendedTime || '0h 0m'}</span>
+                </div>
+                <div class="modal-detail-item">
+                    <span class="modal-detail-label">Break Time</span>
+                    <span class="modal-detail-value">${logData.breakTime || '0h 0m'}</span>
+                </div>
+                <div class="modal-detail-item">
+                    <span class="modal-detail-label">Rule A Exit</span>
+                    <span class="modal-detail-value">${show12Hour ? this.format12Hour(this.parseTimeToMinutes(logData.ruleAExit)) : logData.ruleAExit}</span>
+                </div>
+                <div class="modal-detail-item">
+                    <span class="modal-detail-label">Rule B Exit</span>
+                    <span class="modal-detail-value">${show12Hour ? this.format12Hour(this.parseTimeToMinutes(logData.ruleBExit)) : logData.ruleBExit}</span>
+                </div>
+                <div class="modal-detail-item">
+                    <span class="modal-detail-label">Real Exit Time</span>
+                    <span class="modal-detail-value">${logData.realExitTime ? (show12Hour ? this.format12Hour(this.parseTimeToMinutes(logData.realExitTime)) : logData.realExitTime) : 'Not calculated'}</span>
+                </div>
+                <div class="modal-detail-item">
+                    <span class="modal-detail-label">Efficiency</span>
+                    <span class="modal-detail-value">${logData.efficiency || 0}%</span>
+                </div>
+            </div>
+        `;
+        
+        // Add break timeline if available
+        if (logData.breakSessions && logData.breakSessions.length > 0) {
+            modalHTML += `
+                <div class="break-timeline">
+                    <h4>Break Timeline</h4>
+            `;
+            
+            logData.breakSessions.forEach((session, index) => {
+                const startTime = show12Hour ? this.format12Hour(session.startTime) : this.format24Hour(session.startTime);
+                const endTime = session.endTime ? 
+                    (show12Hour ? this.format12Hour(session.endTime) : this.format24Hour(session.endTime)) : 
+                    'Ongoing';
+                const duration = session.duration ? this.formatDuration(session.duration) : 'Ongoing';
+                
+                modalHTML += `
+                    <div class="break-entry">
+                        <span class="break-time-range">Break ${index + 1}: ${startTime} - ${endTime}</span>
+                        <span class="break-duration">${duration}</span>
+                    </div>
+                `;
+            });
+            
+            modalHTML += '</div>';
+        }
+        
+        content.innerHTML = modalHTML;
+        modal.classList.add('active');
+    }
+
+    closeModal() {
+        document.getElementById('historyModal').classList.remove('active');
     }
 
     // Analytics
@@ -647,14 +921,14 @@ class WorkdayCalculator {
             const dateStr = date.toISOString().split('T')[0];
             
             const log = logs[dateStr];
-            const hours = log ? parseFloat(log.attendedTime) || 0 : 0;
+            const hours = log ? this.parseDurationToHours(log.attendedTime) : 0;
             const maxHours = 10; // Assuming max 10 hours for scaling
             const height = Math.max(20, (hours / maxHours) * 180);
             
             const bar = document.createElement('div');
             bar.className = 'chart-bar';
             bar.style.height = `${height}px`;
-            bar.title = `${day}: ${hours}h`;
+            bar.title = `${day}: ${hours.toFixed(1)}h`;
             
             const label = document.createElement('div');
             label.className = 'chart-label';
@@ -665,6 +939,15 @@ class WorkdayCalculator {
         });
     }
 
+    parseDurationToHours(durationStr) {
+        if (!durationStr) return 0;
+        const match = durationStr.match(/(\d+)h\s*(\d+)m/);
+        if (match) {
+            return parseInt(match[1]) + parseInt(match[2]) / 60;
+        }
+        return 0;
+    }
+
     renderStats(logs) {
         const statsContainer = document.getElementById('statsList');
         statsContainer.innerHTML = '';
@@ -672,7 +955,7 @@ class WorkdayCalculator {
         const logEntries = Object.values(logs);
         const totalDays = logEntries.length;
         const avgHours = totalDays > 0 ? 
-            logEntries.reduce((sum, log) => sum + (parseFloat(log.attendedTime) || 0), 0) / totalDays : 0;
+            logEntries.reduce((sum, log) => sum + this.parseDurationToHours(log.attendedTime), 0) / totalDays : 0;
         const avgEfficiency = totalDays > 0 ?
             logEntries.reduce((sum, log) => sum + (log.efficiency || 0), 0) / totalDays : 0;
         
@@ -705,7 +988,7 @@ class WorkdayCalculator {
             const dateStr = date.toISOString().split('T')[0];
             const log = logs[dateStr];
             if (log) {
-                weekHours += parseFloat(log.attendedTime) || 0;
+                weekHours += this.parseDurationToHours(log.attendedTime);
             }
         }
         
@@ -716,17 +999,23 @@ class WorkdayCalculator {
         const historyContainer = document.getElementById('historyList');
         historyContainer.innerHTML = '';
         
-        const sortedEntries = Object.values(logs)
-            .sort((a, b) => new Date(b.date) - new Date(a.date))
+        const sortedEntries = Object.entries(logs)
+            .sort(([a], [b]) => new Date(b) - new Date(a))
             .slice(0, 10); // Show last 10 entries
         
-        sortedEntries.forEach(log => {
+        sortedEntries.forEach(([date, log]) => {
             const item = document.createElement('div');
             item.className = 'history-item';
             item.innerHTML = `
-                <div class="history-date">${new Date(log.date).toLocaleDateString()}</div>
-                <div class="history-hours">${log.attendedTime}</div>
+                <div class="history-date">${new Date(date).toLocaleDateString()}</div>
+                <div class="history-hours">${log.attendedTime || '0h 0m'}</div>
             `;
+            
+            // Add click event to open modal
+            item.addEventListener('click', () => {
+                this.openHistoryModal(date, log);
+            });
+            
             historyContainer.appendChild(item);
         });
         
@@ -741,20 +1030,20 @@ class WorkdayCalculator {
         const breakReminders = localStorage.getItem('breakReminders') !== 'false';
         const exitReminders = localStorage.getItem('exitReminders') !== 'false';
         const overtimeAlerts = localStorage.getItem('overtimeAlerts') === 'true';
-        const show24Hour = localStorage.getItem('show24Hour') !== 'false';
+        const show12Hour = localStorage.getItem('show12Hour') !== 'false';
         const showSeconds = localStorage.getItem('showSeconds') === 'true';
         
         document.getElementById('breakReminders').checked = breakReminders;
         document.getElementById('exitReminders').checked = exitReminders;
         document.getElementById('overtimeAlerts').checked = overtimeAlerts;
-        document.getElementById('show24Hour').checked = show24Hour;
+        document.getElementById('show12Hour').checked = show12Hour;
         document.getElementById('showSeconds').checked = showSeconds;
         
         // Add event listeners
         document.querySelectorAll('#settings input[type="checkbox"]').forEach(checkbox => {
             checkbox.addEventListener('change', (e) => {
                 localStorage.setItem(e.target.id, e.target.checked);
-                if (e.target.id === 'show24Hour' && document.getElementById('inTime').value) {
+                if ((e.target.id === 'show12Hour' || e.target.id === 'showSeconds') && document.getElementById('inTime').value) {
                     this.calculateResults(); // Refresh display
                 }
             });
